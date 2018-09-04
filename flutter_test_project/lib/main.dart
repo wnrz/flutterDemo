@@ -12,8 +12,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      // home:MyTest(title: 'Demo'),
-      home:Signature(title: '121'),
+      home:Signature(title: 'Demo'),
     );
   }
 }
