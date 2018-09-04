@@ -1,49 +1,66 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 void main() => runApp(new MyApp());
 
 class MyApp extends StatelessWidget {
+  // This widget is the root of your application.
   @override
-  Widget build(BuildContext context) {
-    final title = 'InkWell Demo';
-
-    return new MaterialApp(
-      title: title,
-      home: new MyHomePage(title: title),
-    );
-  }
-}
-
-class MyHomePage extends StatelessWidget {
-  final String title;
-
-  MyHomePage({Key key, this.title}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return new Scaffold(
-      appBar: new AppBar(
-        title: new Text(title),
+  Widget build(BuildContext context){
+    return MaterialApp(
+      title: 'Fade Demo',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
       ),
-      body: new Center(child: new MyButton()),
+      // home:MyTest(title: 'Demo'),
+      home:Signature(title: '121'),
     );
   }
 }
 
-class MyButton extends StatelessWidget {
+class SignaturePainter extends CustomPainter {
+  SignaturePainter(this.points);
+
+  final List<Offset> points;
+
+  void paint(Canvas canvas, Size size) {
+    var paint = Paint()
+      ..color = Colors.black
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 1.0;
+    for (int i = 0; i < points.length - 1; i++) {
+      if (points[i] != null && points[i + 1] != null)
+        canvas.drawLine(points[i], points[i + 1], paint);
+    }
+  }
+
+  bool shouldRepaint(SignaturePainter other) => other.points != points;
+}
+
+class Signature extends StatefulWidget {
+  Signature({Key key, this.title}) : super(key: key);
+  final String title;
   @override
+  SignatureState createState() => SignatureState();
+}
+
+class SignatureState extends State<Signature> {
+
+  List<Offset> _points = <Offset>[];
+
   Widget build(BuildContext context) {
-    // The InkWell Wraps our custom flat button Widget
-    return new InkWell(
-      // When the user taps the button, show a snackbar
-      onTap: () {
-        Scaffold.of(context).showSnackBar(new SnackBar(
-          content: new Text('Tap'),
-        ));
-      },
-      child: new Container(
-        padding: new EdgeInsets.all(12.0),
-        child: new Text('Flat Button'),
+    return Scaffold(
+      body: GestureDetector(
+        onPanUpdate: (DragUpdateDetails details) {
+          setState(() {
+            RenderBox referenceBox = context.findRenderObject();
+            Offset localPosition =
+            referenceBox.globalToLocal(details.globalPosition);
+            _points = List.from(_points)..add(localPosition);
+          });
+        },
+        onPanEnd: (DragEndDetails details) => _points.add(null),
+        child: CustomPaint(painter: SignaturePainter(_points), size: Size.infinite),
       ),
     );
   }
