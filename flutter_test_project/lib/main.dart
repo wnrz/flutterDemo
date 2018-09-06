@@ -1,66 +1,118 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
+import 'dart:convert';
 
-void main() => runApp(new MyApp());
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:async';
+import 'dart:isolate';
+
+void main() {
+  runApp(MyApp());
+}
 
 class MyApp extends StatelessWidget {
-  // This widget is the root of your application.
   @override
-  Widget build(BuildContext context){
+  Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Fade Demo',
+      title: 'Sample App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home:Signature(title: 'Demo'),
+      home: SampleAppPage(),
     );
   }
 }
 
-class SignaturePainter extends CustomPainter {
-  SignaturePainter(this.points);
+class SampleAppPage extends StatefulWidget {
+  SampleAppPage({Key key}) : super(key: key);
 
-  final List<Offset> points;
+  @override
+  _SampleAppPageState createState() => _SampleAppPageState();
+}
 
-  void paint(Canvas canvas, Size size) {
-    var paint = Paint()
-      ..color = Colors.black
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = 1.0;
-    for (int i = 0; i < points.length - 1; i++) {
-      if (points[i] != null && points[i + 1] != null)
-        canvas.drawLine(points[i], points[i + 1], paint);
+class _SampleAppPageState extends State<SampleAppPage> {
+  List widgets = [];
+
+  @override
+  void initState() {
+    super.initState();
+    loadData();
+  }
+
+  showLoadingDialog() {
+    if (widgets.length == 0) {
+      return true;
+    }
+
+    return false;
+  }
+
+  getBody() {
+    if (showLoadingDialog()) {
+      return getProgressDialog();
+    } else {
+      return getListView();
     }
   }
 
-  bool shouldRepaint(SignaturePainter other) => other.points != points;
-}
+  getProgressDialog() {
+    return Center(child: CircularProgressIndicator());
+  }
 
-class Signature extends StatefulWidget {
-  Signature({Key key, this.title}) : super(key: key);
-  final String title;
   @override
-  SignatureState createState() => SignatureState();
-}
-
-class SignatureState extends State<Signature> {
-
-  List<Offset> _points = <Offset>[];
-
   Widget build(BuildContext context) {
     return Scaffold(
-      body: GestureDetector(
-        onPanUpdate: (DragUpdateDetails details) {
-          setState(() {
-            RenderBox referenceBox = context.findRenderObject();
-            Offset localPosition =
-            referenceBox.globalToLocal(details.globalPosition);
-            _points = List.from(_points)..add(localPosition);
-          });
-        },
-        onPanEnd: (DragEndDetails details) => _points.add(null),
-        child: CustomPaint(painter: SignaturePainter(_points), size: Size.infinite),
-      ),
-    );
+        appBar: AppBar(
+          title: Text("Sample App"),
+        ),
+        body: getBody());
+  }
+
+  ListView getListView() => ListView.builder(
+      itemCount: widgets.length,
+      itemBuilder: (BuildContext context, int position) {
+        return getRow(position);
+      });
+
+  Widget getRow(int i) {
+    return Padding(padding: EdgeInsets.all(10.0), child: Text("Row ${widgets[i]["title"]}"));
+  }
+
+  loadData() async {
+    ReceivePort receivePort = ReceivePort();
+    await Isolate.spawn(dataLoader, receivePort.sendPort);
+
+    // The 'echo' isolate sends its SendPort as the first message
+    SendPort sendPort = await receivePort.first;
+
+    List msg = await sendReceive(sendPort, "https://jsonplaceholder.typicode.com/posts");
+
+    setState(() {
+      widgets = msg;
+    });
+  }
+
+// the entry point for the isolate
+  static dataLoader(SendPort sendPort) async {
+    // Open the ReceivePort for incoming messages.
+    ReceivePort port = ReceivePort();
+
+    // Notify any other isolates what port this isolate listens to.
+    sendPort.send(port.sendPort);
+
+    await for (var msg in port) {
+      String data = msg[0];
+      SendPort replyTo = msg[1];
+
+      String dataURL = data;
+      http.Response response = await http.get(dataURL);
+      // Lots of JSON to parse
+      replyTo.send(json.decode(response.body));
+    }
+  }
+
+  Future sendReceive(SendPort port, msg) {
+    ReceivePort response = ReceivePort();
+    port.send([msg, response.sendPort]);
+    return response.first;
   }
 }
